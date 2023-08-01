@@ -14,6 +14,7 @@ parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase
 parser.add_argument("-p", "--param", type=float, nargs="*", help="Importance sampling parameters. If not specified, take the values : [0.01, 0.1, 1, 0, 1, 0]")
 parser.add_argument("--n_instances", type=int, default=1, help="Number of instances")
 parser.add_argument("--n_instances_pre", type=int, default=0, help="Number of instances already sampled")
+parser.add_argument("--wind_importance", type=bool, default=False, help="True if you want to compute wind importance")
 
 args = parser.parse_args()
 if args.directory is None:

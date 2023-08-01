@@ -32,9 +32,6 @@ def print_progress_bar(iteration, total, prefix = "", suffix = "", decimals = 1)
         prefix (str, optional): _description_. Defaults to "".
         suffix (str, optional): _description_. Defaults to "".
         decimals (int, optional): _description_. Defaults to 1.
-        length (int, optional): _description_. Defaults to 100.
-        fill (str, optional): _description_. Defaults to "█".
-        print_end (str, optional): _description_. Defaults to "\r".
     """
     fill = "█"
     length = 100

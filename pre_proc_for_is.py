@@ -45,7 +45,7 @@ def process_all(raw_data_dir, save_dir, cropping, args):
         day_name = filename[len(raw_data_dir):len(raw_data_dir)+20]
         if day_name not in done_days:
             count += 1
-            l_grid = process_day(day_name, count, save_dir_splitted, args)
+            l_grid = process_day(day_name, count, raw_data_dir, save_dir_splitted, args)
             done_days.append(day_name)
             if cropping:
                 crop(l_grid, save_dir, args)
@@ -56,7 +56,7 @@ def process_all(raw_data_dir, save_dir, cropping, args):
                     print_progress(index, n_days, start_time)
 
 
-def process_day(day_name, day_number, save_dir, args):
+def process_day(day_name, day_number, raw_data_dir, save_dir, args):
     """Gather the files concerning a same say
 
     Args:
@@ -125,20 +125,21 @@ def split_by_lead_time_and_member(mat, args):
     return data
 
 def crop(l_grid, save_dir, args):
-    """Crop the grids according to INDEXES
+    """Crop the grids according to args.crop_indexes
 
     Args:
-        l_grid (list[tuple[numpy.array, str]]): a list of shape [384, 2] with the tuple containing grids of shape [4, 717, 1121] and the sample name
+        l_grid (list[tuple[numpy.array, str]]): a list of shape [n_grid, 2] with the tuple containing grids of shape [4, 717, 1121] and the sample name
         save_dir (str): Directory where the data is saved
         args (argparse.Namespace): args of the program
     """
     if args.verbose >= 2: print("Cropping...")
-    save_dir_cropped = save_dir + "cropped/"
+    index_string = '_'.join([str(index) for index in args.crop_indexes])
+    save_dir_cropped = save_dir + "cropped" + index_string + "/"
     make_save_dir(save_dir_cropped, args)
 
-    n_grid  = len(l_grid) # should be 384
+    n_grid  = len(l_grid)
     for index, (grid, sample_name) in enumerate(l_grid):
-        lb_index, rb_index, lu_index, ru_index = INDEXES
+        lb_index, rb_index, lu_index, ru_index = args.crop_indexes
         grid = grid[:, lb_index:rb_index, lu_index:ru_index] # grid shape = [4, 717, 1121] (n_variables, x, y)
         np.save(save_dir_cropped + sample_name, grid, allow_pickle=True)
         if args.verbose >= 3: print_progress_bar(index, n_grid)
@@ -158,7 +159,11 @@ def merge_into_gigafiles(working_dir, datatype, args):
         raise ValueError("Datatype must be in " + str(s_datatype) + " you gave '" + datatype + "'.")
     dataframe = pd.read_csv(working_dir + "splitted/labels.csv")
     data_dir = working_dir + datatype
-    save_dir = data_dir + "_giga/"
+    index_string = '_'.join([str(index) for index in args.crop_indexes])
+    if datatype == "cropped":
+        save_dir = data_dir + index_string + "_giga/"
+    else:
+        save_dir = data_dir + "_giga/"
     data_dir += "/"
     make_save_dir(save_dir, args)
     with open(save_dir + "labels.csv", "w", encoding="utf8") as file:
@@ -267,7 +272,7 @@ if __name__ == "__main__":
 
     parser.add_argument("save_directory", type=str, default=None, help="Directory where data will be saved: 'pre_proc_' + save_directory")
     parser.add_argument("-l", "--load_directory", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/brochetc/float32_t2m_u_v_rr/", help="Data directory from which data is loaded")
-    parser.add_argument("-c", "--crop_index", type=int, nargs="*", default=[120, 376, 540, 796] ,help="Crop index. If not specified, take the values : [120, 376, 540, 796] (SE_indexes). If no crop is wanted, pass 0 as an argument. Ex: -c 120 376 540 796 for SE_indexes; -c 0 for no crop")
+    parser.add_argument("-c", "--crop_indexes", type=int, nargs="*", default=[120, 376, 540, 796] ,help="Crop index. If not specified, take the values : [120, 376, 540, 796] (SE_indexes). If no crop is wanted, pass 0 as an argument. Ex: -c 120 376 540 796 for SE_indexes; -c 0 for no crop")
     parser.add_argument("-s", "--save_path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/", help="Path where data is saved")
     parser.add_argument("-r", "--refresh", type=int, default=10, help="Frequence at which progress is shown")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
@@ -277,7 +282,7 @@ if __name__ == "__main__":
 
     #### GLOBAL ####
     VAR_NAMES = ["rr", "u", "v", "t2m"]
-    INDEXES = args.crop_index # SE_INDEXES = (120, 376, 540, 796); FR_INDEXES = (20, 680, 150, 972)
+    INDEXES = args.crop_indexes # SE_INDEXES = (120, 376, 540, 796); FR_INDEXES = (20, 680, 150, 972)
     CROPPING = (len(INDEXES) == 4)
 
 
@@ -288,5 +293,11 @@ if __name__ == "__main__":
     # rename_rr_files(RAW_DATA_DIR, args)
     # process_all(RAW_DATA_DIR, SAVE_DIR, CROPPING, args)
     # merge_into_gigafiles(SAVE_DIR, "splitted", args)
-    if CROPPING:
-        merge_into_gigafiles(SAVE_DIR, "cropped", args)
+    # if CROPPING:
+    #     merge_into_gigafiles(SAVE_DIR, "cropped", args)
+    
+    
+    DATA_PATH_GIGA = args.load_directory
+    SAVE_DIR = args.save_path + "pre_proc_" + args.save_directory + "/"
+    crop_from_gigafiles(DATA_PATH_GIGA, SAVE_DIR, args)
+

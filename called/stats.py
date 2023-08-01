@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from utile import (make_save_dir, parse_float, print_progress,
+from called.utile import (make_save_dir, parse_float, print_progress,
                    print_progress_bar)
 
 
@@ -31,7 +31,7 @@ def run_stat(variable, gridshape, dirs, threshold, args):
         print("\n")
         print("Saving results...")
     for instance in range(args.n_instances - args.n_instances_pre):
-        if args.verbose >= 1: print("\n---Instance", args.n_instances_pre + instance + 1, " saving---")
+        if args.verbose >= 3: print("\n---Instance", args.n_instances_pre + instance + 1, " saving---")
         save_dir_instance = save_dir + "INST" + str(args.n_instances_pre + instance + 1) + "/threshold_" + parse_float(str(threshold)) + "/"
         make_save_dir(save_dir_instance, args)
         hist_from_arr(i_values[instance], save_dir_instance, args)
@@ -83,9 +83,6 @@ def handle_patch(variable, gridshape, csv_dir, csv_dir_is, data_dir, threshold, 
             i_mean_map[instance] /= i_n_grid[instance]
             i_variance_map[instance] /= i_n_grid[instance]
             i_variance_map[instance] -= i_mean_map[instance]**2
-        
-        if (gigafile_index + 1) % ((n_patch + 1) // args.refresh) == 0:
-            print_progress(gigafile_index, n_patch+1, start_time)
     return i_dataframe_is, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch
 
 def patch_stats(n_patch, data_dir, i_gigafile_group, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch, args):
@@ -112,7 +109,7 @@ def patch_stats(n_patch, data_dir, i_gigafile_group, i_global_r, i_files_r, i_ra
             print_progress(gigafile_index, n_patch, start_time)
         i_data = [[] for _ in range(args.n_instances_pre, args.n_instances)]
         for instance in range(args.n_instances - args.n_instances_pre):
-            if args.verbose >= 2: print("\n---Instance", args.n_instances_pre + instance + 1, "---")
+            if args.verbose >= 3: print("\n---Instance", args.n_instances_pre + instance + 1, "---")
             if gigafile_index in i_gigafile_group[instance].groups:
                 instance_dataframe = i_gigafile_group[instance].get_group(gigafile_index)
                 for row in instance_dataframe.itertuples():
@@ -139,14 +136,14 @@ def rate_gt(variable, data, x_min, args):
     Returns:
         tuple[float, list[float]]: return the global sum and a list of rate for each file
     """
-    if args.verbose >= 2: print("\nComputing rate_gt...")
+    if args.verbose >= 3: print("\nComputing rate_gt...")
     grid = data[0]
     grid_size = grid.shape[1] * grid.shape[2]
     n_grid = len(data)
     total_count = 0
     file_results = []
     for index, grid in enumerate(data):
-        if args.verbose >= 2: print_progress_bar(index, n_grid)
+        if args.verbose >= 3: print_progress_bar(index, n_grid)
         local_count = np.count_nonzero(grid[variable] >= x_min)
         file_results.append(local_count / grid_size)
         total_count += local_count
@@ -166,12 +163,12 @@ def pixel_rate(variable, data, x_min, args):
     Returns:
         numpy.array: grid where each gridpoint has the sum of each time the value is greater than x
     """
-    if args.verbose >= 2: print("\nComputing pixel_rate...")
+    if args.verbose >= 3: print("\nComputing pixel_rate...")
     grid = data[0]
     n_grid = len(data)
     rate_map = np.zeros([grid.shape[1], grid.shape[2]])
     for index, grid in enumerate(data):
-        if args.verbose >= 2: print_progress_bar(index, n_grid)
+        if args.verbose >= 3: print_progress_bar(index, n_grid)
         rate_map += 1 * (grid[variable] >= x_min)
     return rate_map
 
@@ -186,12 +183,12 @@ def mean_samples(variable, data, args):
     Returns:
         numpy.array: the grid resulting from the sum of every grid
     """
-    if args.verbose >= 2: print("\nComputing mean_samples...")
+    if args.verbose >= 3: print("\nComputing mean_samples...")
     grid = data[0]
     n_grid = len(data)
     temp_mean_grid = np.zeros([grid.shape[1], grid.shape[2]])
     for index, grid in enumerate(data):
-        if args.verbose >= 2: print_progress_bar(index, n_grid)
+        if args.verbose >= 3: print_progress_bar(index, n_grid)
         temp_mean_grid += grid[variable]
     return temp_mean_grid
 
@@ -207,12 +204,12 @@ def variance_samples(variable, data, args):
     Returns:
         numpy.array: the grid resulting from the sum of the values squared of every grid
     """
-    if args.verbose >= 2: print("\nComputing variance_samples...")
+    if args.verbose >= 3: print("\nComputing variance_samples...")
     grid = data[0]
     n_grid = len(data)
     variance_grid = np.zeros([grid.shape[1], grid.shape[2]])
     for index, grid in enumerate(data):
-        if args.verbose >= 2: print_progress_bar(index, n_grid)
+        if args.verbose >= 3: print_progress_bar(index, n_grid)
         variance_grid += grid[variable]**2
     return variance_grid
 
@@ -229,10 +226,10 @@ def extract_values_greater_than(variable, data, threshold, args):
     Returns:
         list[float]: store every value greater than the threshold
     """
-    if args.verbose >= 2: print("\nExtracting values greater than ", threshold, "...", sep="")
+    if args.verbose >= 3: print("\nExtracting values greater than ", threshold, "...", sep="")
     n_grid = len(data)
     for index, grid in enumerate(data):
-        if args.verbose >= 2: print_progress_bar(index, n_grid)
+        if args.verbose >= 3: print_progress_bar(index, n_grid)
         mask = grid[variable] > threshold
         extracted_values = grid[variable][mask]
     return extracted_values
@@ -250,7 +247,7 @@ def hist_from_arr(arr, save_dir, args):
     np.save(save_dir + "hist.npy", arr, allow_pickle=True)
     plt.hist(arr, bins=50, density=True)
     plt.savefig(save_dir + "hist.png")
-    if args.verbose >= 1: print("saved histogram.")
+    if args.verbose >= 2: print("saved histogram.")
     
 
 
@@ -340,7 +337,7 @@ def save_global(arr_glob, l_arr_glob, save_dir, histname, param_string, args):
     plt.hist(arr_glob, bins=50, density=True)
     plt.savefig(save_dir + histname + ".png")
     np.save(save_dir + histname + ".npy", arr_glob, allow_pickle=True)
-    if args.verbose >= 1: print("saved numpy", histname)
+    if args.verbose >= 2: print("saved numpy", histname)
     for idx, name in enumerate(l_names):
         plt.clf()
         grid = l_arr_glob[idx]
@@ -370,13 +367,13 @@ def stat_on_source(data_dir, save_dir, args):
     start_time = time()
     val = []
     for index, row in dataframe.iterrows():
-        if (index + 1) % (n_grid // args.refresh) == 0:
+        if args.verbose >= 2 and (index + 1) % (n_grid // args.refresh) == 0:
             print_progress(index, n_grid, start_time)
         if row["Gigafile"] != current_patch:
             current_patch += 1
-            print("\nLoading patch", current_patch, "/", n_patch, "...")
+            if args.verbose >= 1: print("\nLoading patch", current_patch, "/", n_patch, "...")
             l_grid = np.load(data_dir + str(current_patch) + ".npy")
-            print("Done.\n")
+            if args.verbose >= 1: print("Done.\n")
             val += list(extract_values_greater_than(0, l_grid, 0, args))
     hist_from_arr(val, save_dir, args)
 
