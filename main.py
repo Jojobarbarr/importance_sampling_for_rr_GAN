@@ -12,6 +12,7 @@ parser.add_argument("save", type=str, default=None, help="Data directory where t
 parser.add_argument("-r", "--refresh", type=int, default=10, help="Frequence at which progress is shown")
 parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
 parser.add_argument("-p", "--param", type=float, nargs="*", help="Importance sampling parameters. If not specified, take the values : [0.01, 0.1, 1, 0, 1, 0]")
+parser.add_argument("--main_path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/", help="Base path")
 parser.add_argument("--n_instances", type=int, default=1, help="Number of instances")
 parser.add_argument("--n_instances_pre", type=int, default=0, help="Number of instances already sampled")
 parser.add_argument("--wind_importance", type=bool, default=False, help="True if you want to compute wind importance")
@@ -40,10 +41,11 @@ VAR_NAMES = ["rr", "u", "v", "t2m"]
 VAR = VAR_NAMES.index(VAR)
 THRESHOLD_STR = parse_float(str(THRESHOLD))
 #### PATH ####
-MAIN_PATH = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/"
+MAIN_PATH = args.main_path
 DIRECTORY = args.directory
 
 #### IMPORTANCE SAMPLING ####
+# nohup python3 -u main.py -vv -r 5 -p -1 3 1 0 3 0 --n_instances 50 pre_proc_31-07-10h/cropped_giga/ 2-08-8h_256/ > output/-1_3_3.txt 2> output/-1_3_3.err &
 ## PATH ##
 CSV_DIR = MAIN_PATH + DIRECTORY
 DATA_DIR = MAIN_PATH + DIRECTORY
