@@ -252,22 +252,39 @@ def crop_from_gigafiles(data_path_giga, save_dir,  args):
             print("\n")
     merge_into_gigafiles(save_dir, "cropped", args)
 
-# def split(dataframe, DATA_DIR, SAVE_DIR):
-#     n_patch = int(dataframe.iloc[-1]["Gigafile"])
-#     start_time = time()
-#     for gigafile_index in range(1, n_patch + 1):
-#         print("\nLoading patch", gigafile_index, "/", n_patch, "...")
-#         data = np.load(DATA_DIR + str(gigafile_index) + ".npy", allow_pickle=True)
-#         print("Done.\n")
-#         if (gigafile_index + 1) % (n_patch // 10) == 0:
-#             print_progress(gigafile_index, n_patch, start_time)
-#         for row in dataframe.itertuples():
-#             if row.Gigafile == gigafile_index:
-#                 np.save(SAVE_DIR + row.Name + ".npy", data[row.Localindex], allow_pickle=True)
+def split(data_path_giga, save_dir, args):
+    """Split gigafiles into small unit files.
 
+    Args:
+        data_path_giga (str): Data path to the directory of the gigafiles
+        save_dir (str): Directory where data is saved
+        args (argparse.Namespace): args of the program
+    """
+    if args.verbose >= 1: print("Splitting from gigafiles...")
+    make_save_dir(save_dir, args)
+    with open(save_dir + "labels.csv", "w", encoding="utf8") as file:
+        file.write("Name,Date,Leadtime,Member\n")
+        file.close()
+    dataframe = pd.read_csv(data_path_giga + "labels.csv")
+    data_group_gigafile = dataframe.groupby("Gigafile")
+    n_gigafiles = sum(1 for entry in os.scandir(data_path_giga)) - 1
+    start_time = time()
+    for index, entry in enumerate(os.scandir(data_path_giga)):
+        if args.verbose >= 2: 
+            print("Processing Gigafile", index + 1, "of", n_gigafiles)
+            if args.verbose >= 3 and (index + 1) % (n_gigafiles // args.refresh) == 0:
+                print_progress(index, n_gigafiles, start_time)
+        if entry.name != "labels.csv":
+            l_grid = np.load(entry.path, allow_pickle=True)
+            for row in data_group_gigafile.get_group(int(entry.name[:-4])).itertuples():
+                grid = l_grid[row.Localindex]
+                with open(save_dir + "labels.csv", "a", encoding="utf8") as file:
+                    file.write(row.Name + "," + row.Date + "," + str(row.Leadtime) + "," + str(row.Member) + "\n")
+                    file.close()
+                np.save(save_dir + row.Name + ".npy", grid, allow_pickle=True)
 
 if __name__ == "__main__":
-    #### ARGPARSE ####
+    ## ARGPARSE ##
     parser = ArgumentParser()
 
     parser.add_argument("save_directory", type=str, default=None, help="Directory where data will be saved: 'pre_proc_' + save_directory")
@@ -280,24 +297,34 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 
-    #### GLOBAL ####
+    ## GLOBAL ##
     VAR_NAMES = ["rr", "u", "v", "t2m"]
     INDEXES = args.crop_indexes # SE_INDEXES = (120, 376, 540, 796); FR_INDEXES = (20, 680, 150, 972)
     CROPPING = (len(INDEXES) == 4)
 
+    #### INIT PREPROC ####
 
-    #### PATH ####
-    RAW_DATA_DIR = args.load_directory
-    SAVE_DIR = args.save_path + "pre_proc_" + args.save_directory + "/"
-
+    # ## PATH ##
+    # RAW_DATA_DIR = args.load_directory
+    # SAVE_DIR = args.save_path + "pre_proc_" + args.save_directory + "/"
+    
     # rename_rr_files(RAW_DATA_DIR, args)
     # process_all(RAW_DATA_DIR, SAVE_DIR, CROPPING, args)
     # merge_into_gigafiles(SAVE_DIR, "splitted", args)
     # if CROPPING:
     #     merge_into_gigafiles(SAVE_DIR, "cropped", args)
     
-    
-    DATA_PATH_GIGA = args.load_directory
-    SAVE_DIR = args.save_path + "pre_proc_" + args.save_directory + "/"
-    crop_from_gigafiles(DATA_PATH_GIGA, SAVE_DIR, args)
+    #### CROPPING FROM GIGA SPLITTED ####
 
+    # ## PATH ##
+    # DATA_PATH_GIGA = args.load_directory
+    # SAVE_DIR = args.save_path + "pre_proc_" + args.save_directory + "/"
+    
+    # crop_from_gigafiles(DATA_PATH_GIGA, SAVE_DIR, args)
+
+    #### SPLITTING FROM GIGAFILE ####
+    # python3 pre_proc_for_is.py --save_path "/scratch/mrmn/gandonb/data/source/" -vvv --load_directory "/scratch/mrmn/gandonb/data/source/DIR_giga/" DIR
+    ## PATH ##
+    DATA_PATH_GIGA = args.load_directory
+    SAVE_DIR = args.save_path + args.save_directory + "/"
+    split(DATA_PATH_GIGA, SAVE_DIR, args)
