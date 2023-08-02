@@ -291,9 +291,9 @@ def save_mix(param_string, threshold, dirs, args):
         logfile.write("\nThreshold: " + str(threshold))
         logfile.write("\nMean global rate: " + str(l_data_log_glob[1]))
     histname += "_" + param_string
-    save_global(arr_glob, l_arr_glob, save_dir, histname, param_string, args)
+    save_global(arr_glob, l_arr_glob, save_dir, histname, l_names, param_string, args)
 
-def load_into_global_arrays(data_dir, threshold, histname, args):
+def load_into_global_arrays(data_dir, threshold, histname, l_names, args):
     """Load by iterating over the instances the stats in a global array
 
     Args:
@@ -302,10 +302,6 @@ def load_into_global_arrays(data_dir, threshold, histname, args):
         histname (str): names of the histogram files
         args (argparse.Namespace): args of the program
     """
-    rate_name = "rate_grid"
-    mean_name = "mean_grid"
-    variance_name = "variance_grid"
-    l_names = [rate_name, mean_name, variance_name]
     l_arr_glob = [[], [], []]
     arr_glob = np.empty(0)
     l_data_log_glob = [0, 0]
@@ -326,7 +322,7 @@ def load_into_global_arrays(data_dir, threshold, histname, args):
             l_arr_glob[l_names.index(name)].append(arr)
     return l_arr_glob, arr_glob, l_data_log_glob
 
-def save_global(arr_glob, l_arr_glob, save_dir, histname, param_string, args):
+def save_global(arr_glob, l_arr_glob, save_dir, histname, l_names, param_string, args):
     """Plot and save the global stats
 
     Args:

@@ -4,6 +4,8 @@ from called.process_is import importance_sampling
 from called.stats import run_stat, save_mix
 from called.utile import make_save_dir, parse_float
 
+# nohup python3 -u main.py -vv -r 5 -p -1 3 1 0 3 0 --n_instances 50 pre_proc_31-07-10h/cropped_giga/ 2-08-8h_256/ > output/-1_3_3.txt 2> output/-1_3_3.err &
+
 #### ARGPARSE ####
 parser = ArgumentParser()
 
@@ -12,6 +14,8 @@ parser.add_argument("save", type=str, default=None, help="Data directory where t
 parser.add_argument("-r", "--refresh", type=int, default=10, help="Frequence at which progress is shown")
 parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
 parser.add_argument("-p", "--param", type=float, nargs="*", help="Importance sampling parameters. If not specified, take the values : [0.01, 0.1, 1, 0, 1, 0]")
+parser.add_argument("-t", "--threshold", type=float, help="Threshold for stats")
+parser.add_argument("--stats_only", type=bool, help="If True, only run_stat and save_mix are executed")
 parser.add_argument("--main_path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/", help="Base path")
 parser.add_argument("--n_instances", type=int, default=1, help="Number of instances")
 parser.add_argument("--n_instances_pre", type=int, default=0, help="Number of instances already sampled")
@@ -34,7 +38,7 @@ PARAM_STRING = parse_float(str(Q_MIN) + "_" + str(M) + "_" + str(P) + "_" + str(
 
 ## STATS ##
 VAR = "rr"
-THRESHOLD = 0.1
+THRESHOLD = args.threshold
 GRIDSHAPE = [256, 256]
 
 VAR_NAMES = ["rr", "u", "v", "t2m"]
@@ -45,7 +49,6 @@ MAIN_PATH = args.main_path
 DIRECTORY = args.directory
 
 #### IMPORTANCE SAMPLING ####
-# nohup python3 -u main.py -vv -r 5 -p -1 3 1 0 3 0 --n_instances 50 pre_proc_31-07-10h/cropped_giga/ 2-08-8h_256/ > output/-1_3_3.txt 2> output/-1_3_3.err &
 ## PATH ##
 CSV_DIR = MAIN_PATH + DIRECTORY
 DATA_DIR = MAIN_PATH + DIRECTORY
@@ -53,7 +56,8 @@ SAVE_DIR = MAIN_PATH + "importance_sampling/" + args.save + PARAM_STRING +"/"
 
 DIRS = (CSV_DIR, DATA_DIR, SAVE_DIR)
 
-importance_sampling(PARAMETERS, DIRS, args)
+if not args.stats_only:
+    importance_sampling(PARAMETERS, DIRS, args)
 
 #### STATS ####
 ## PATH ##
