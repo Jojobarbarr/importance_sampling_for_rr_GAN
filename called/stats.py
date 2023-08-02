@@ -8,9 +8,9 @@ import matplotlib
 matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 from called.utile import (make_save_dir, parse_float, print_progress,
-                   print_progress_bar)
+                          print_progress_bar)
+from matplotlib import pyplot as plt
 
 
 def run_stat(variable, gridshape, dirs, threshold, args):
@@ -73,7 +73,7 @@ def handle_patch(variable, gridshape, csv_dir, csv_dir_is, data_dir, threshold, 
     i_values_patch = [[] for _ in range(args.n_instances_pre, args.n_instances)]
     
     i_gigafile_group = [dataframe_is.groupby("Gigafile") for dataframe_is in i_dataframe_is]
-    patch_stats(n_patch, data_dir, i_gigafile_group, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch, args)
+    patch_stats(n_patch, variable, threshold, data_dir, i_gigafile_group, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch, args)
     for instance in range(args.n_instances - args.n_instances_pre):
         if i_n_grid[instance] == 0:
             print("Instance", instance, "no value.")
@@ -85,7 +85,7 @@ def handle_patch(variable, gridshape, csv_dir, csv_dir_is, data_dir, threshold, 
             i_variance_map[instance] -= i_mean_map[instance]**2
     return i_dataframe_is, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch
 
-def patch_stats(n_patch, data_dir, i_gigafile_group, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch, args):
+def patch_stats(n_patch, variable, threshold, data_dir, i_gigafile_group, i_global_r, i_files_r, i_rate_map, i_mean_map, i_variance_map, i_values_patch, args):
     """Perform stat on the patch and add them to the previous computed stats
 
     Args:
@@ -279,6 +279,10 @@ def save_mix(param_string, threshold, dirs, args):
     """
     data_dir, save_dir = dirs
     histname = "hist"
+    rate_name = "rate_grid"
+    mean_name = "mean_grid"
+    variance_name = "variance_grid"
+    l_names = [rate_name, mean_name, variance_name]
     l_arr_glob, arr_glob, l_data_log_glob = load_into_global_arrays(data_dir, threshold, histname, l_names, args)
     for idx in range(len(l_data_log_glob)):
         l_data_log_glob[idx] /= args.n_instances
@@ -382,16 +386,42 @@ def stat_on_source(data_dir, save_dir, args):
 
 
 if __name__ == "__main__":
-    #### ARGPARSE ####
+    ## ARGPARSE ##
     parser = ArgumentParser()
     parser.add_argument("--refresh", type=int, default=10)
     parser.add_argument("--bins", type=int, default=50)
     parser.add_argument("--verbose", type=bool, default=True)
     args = parser.parse_args()
 
-    #### PATH ####
-    DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/crop_processed_giga/"
-    SAVE_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/analysis/source/"
-    make_save_dir(SAVE_DIR, args)
+    #### STATS ON SOURCE ####
+    # ## PATH ##
+    # DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/crop_processed_giga/"
+    # SAVE_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/analysis/source/"
+    # make_save_dir(SAVE_DIR, args)
 
-    stat_on_source(DATA_DIR, SAVE_DIR, args)
+    # stat_on_source(DATA_DIR, SAVE_DIR, args)
+
+    #### VERIFY SPLIT ####
+    # ## PATH ##
+    # RAW_DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/brochetc/float32_t2m_u_v_rr/"
+    # DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/pre_proc_31-07-10h/cropped_giga/"
+    # SAVE_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/pre_proc_31-07-10h/draft/"
+    
+    # GRID_NUM = 0
+    # VMAX = 0.02
+    # make_save_dir(SAVE_DIR, args)
+    # l_grid = np.load(DATA_DIR + str(1) + ".npy", allow_pickle=True)
+    # fig, axes = plt.subplots()
+    # img = axes.imshow(l_grid[GRID_NUM][0], origin="lower", vmin=0, vmax=VMAX)
+    # fig.colorbar(img)
+    # fig.savefig(SAVE_DIR + "rr.png")
+    # dataframe = pd.read_csv(DATA_DIR + "labels.csv")
+    # row = dataframe.iloc[GRID_NUM]
+    # orig_grid = np.load(RAW_DATA_DIR + row["Date"] + "_rrlt1-24.npy", allow_pickle=True)
+    # fig, axes = plt.subplots()
+    # img = axes.imshow(orig_grid[:, :, int(row["Leadtime"])-1, int(row["Member"])-1], origin="lower", vmin=0, vmax=VMAX)
+    # fig.colorbar(img)
+    # fig.savefig(SAVE_DIR + "rr_orig.png")
+    
+
+
