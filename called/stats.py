@@ -38,7 +38,7 @@ def run_stat(variable, gridshape, dirs, threshold, args):
         save_stats(i_rate_calc[instance], save_dir_instance, "rate_grid", args)
         save_stats(i_mean_calc[instance], save_dir_instance, "mean_grid", args)
         save_stats(i_variance_calc[instance], save_dir_instance, "variance_grid", args)
-        with open(save_dir_instance + "log.txt", "a", encoding="utf8") as file:
+        with open(save_dir_instance + "log.txt", "w", encoding="utf8") as file:
             file.write("Number of files: "+str(len(i_dataframe_is[instance])))
             file.write("\nThreshold: "+str(threshold))
             file.write("\nGlobal rate: "+str(i_global_rate[instance]))
@@ -144,7 +144,7 @@ def rate_gt(variable, data, x_min, args):
     file_results = []
     for index, grid in enumerate(data):
         if args.verbose >= 3: print_progress_bar(index, n_grid)
-        local_count = np.count_nonzero(grid[variable] >= x_min)
+        local_count = np.count_nonzero(grid[variable] > x_min)
         file_results.append(local_count / grid_size)
         total_count += local_count
     return total_count, file_results
@@ -169,7 +169,7 @@ def pixel_rate(variable, data, x_min, args):
     rate_map = np.zeros([grid.shape[1], grid.shape[2]])
     for index, grid in enumerate(data):
         if args.verbose >= 3: print_progress_bar(index, n_grid)
-        rate_map += 1 * (grid[variable] >= x_min)
+        rate_map += 1 * (grid[variable] > x_min)
     return rate_map
 
 def mean_samples(variable, data, args):
