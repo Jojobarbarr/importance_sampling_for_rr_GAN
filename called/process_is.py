@@ -46,6 +46,32 @@ def importance(grid, parameters, args):
         return q_min + (m / grid_size) * (p * i_s_rr_sum + q * i_s_w_sum)
     return q_min + (m / grid_size) * (p * i_s_rr_sum)
 
+def importance_sig(grid, parameters, args):
+    """Compute the importance of a grid
+
+    Args:
+        grid (numpy.array): a numpy array grid with several channels of shape = [4, x, y]
+        parameters (tuple[float]): Parameters of importance sampling (q_min, m, p, q, s_rr, s_w)
+        args (argparse.Namespace): args of the program
+    Returns:
+        float: the importance. If greater than 1, return 1
+    """
+    q_min, m, p, q, s_rr, s_w = parameters
+    slope = 1
+    i_s_rr = 1 / (1 + np.exp(-(grid[0] - s_rr) / slope))
+    i_s_rr = np.expand_dims(i_s_rr, axis=0)
+    grid = np.append(grid, i_s_rr, axis=0)
+    i_s_rr_sum = grid[4].sum()
+    if args.wind_importance:
+        w = np.sqrt(grid[1]**2+grid[2]**2)
+        i_s_w = 1 / (1 + np.exp(-(w - s_w) / slope))
+        i_s_w = np.expand_dims(i_s_w, axis=0)
+        grid = np.append(grid, i_s_w, axis=0)
+        i_s_w_sum = grid[5].sum()
+    grid_size = grid.shape[1]*grid.shape[2] # shape = [5 or 6, x, y]
+    if args.wind_importance:
+        return q_min - m / (1 + np.exp(s_rr / slope)) + (m / grid_size) * (p * i_s_rr_sum + q * i_s_w_sum)
+    return q_min - m / (1 + np.exp(s_rr / slope)) + (m / grid_size) * (p * i_s_rr_sum)
 
 def sample_for_instance(save_dir, p_importance, row, args):
     """For each instance, sample and writes data in the csv file
@@ -92,7 +118,10 @@ def importance_sampling(parameters, dirs, args):
             if args.verbose >= 2: print("Done.\n")
         grid = l_grid[row["Localindex"]]
         if args.verbose >= 3: print("Grid", index, "out of", n_grid)
-        p_importance = importance(grid, parameters, args)
+        if args.sigmoid:
+            p_importance = importance_sig(grid, parameters, args)
+        else:
+            p_importance = importance(grid, parameters, args)
         sample_for_instance(save_dir, p_importance, row, args)
     if args.verbose >= 1: print("DONE importance sampling.")
 

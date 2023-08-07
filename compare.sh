@@ -1,5 +1,5 @@
-dir="2-08-15h_256/"
-t=0
+dir="7-08-14h/"
+t=0.2
 
 python3 compare_hist_2_by_2.py -vv -r 0 20 -t $t $dir > output/out.out &
 python3 compare_hist_2_by_2.py -vv -r 4 20 -t $t $dir > output/out.out &

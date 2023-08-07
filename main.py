@@ -15,6 +15,7 @@ parser.add_argument("-r", "--refresh", type=int, default=10, help="Frequence at 
 parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
 parser.add_argument("-p", "--param", type=float, nargs="*", help="Importance sampling parameters. If not specified, take the values : [0.01, 0.1, 1, 0, 1, 0]")
 parser.add_argument("-t", "--threshold", type=float, default=0.1, help="Threshold for stats")
+parser.add_argument("--sigmoid", action="store_true", help="If used, run importance sampling with the sigmoid function")
 parser.add_argument("--stats_only", action="store_true", help="If used, only run_stat and save_mix are executed")
 parser.add_argument("--main_path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/", help="Base path")
 parser.add_argument("--n_instances", type=int, default=1, help="Number of instances")
