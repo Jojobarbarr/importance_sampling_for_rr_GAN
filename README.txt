@@ -7,4 +7,7 @@ Open these 3 files and uncomment eveything in the main section then execute them
 
 If splitting already done, it's possible to call crop_from_gigafiles from pre_proc_for_is, it will be quickier than cropping from little files.
 
-Once cropping is done, only main.py and compare_hist_2_by_2.py are useful. 
+Once cropping is done, only main.py and compare_hist_2_by_2.py are useful.
+It is then possible to use launch.sh to run importance sampling, just change the name of $dir and q_min, m and s_rr values.
+To run stats only on an already importance sampled dataset, run launch_only_stats.sh with the correct values and name in $dir and $t.
+To draw and save histograms between two sets of parameter, run compare.sh with the good name in $dir and the good value for threshold $t (-t option for main.py).
