@@ -236,13 +236,14 @@ def split(data_dir, args):
     """
     if args.verbose >= 1:
         print("Splitting from gigafiles...")
-    make_save_dir(f"{data_dir}/", args)
     with open(f"{data_dir}/labels.csv", "w", encoding="utf8") as file:
         file.write("Name,Date,Leadtime,Member,Gigafile,Localindex\n")
     dataframe = pd.read_csv(f"{data_dir}_giga/labels.csv")
     data_group_gigafile = dataframe.groupby("Gigafile")
     gigafiles_set = {
-        gigafile for gigafile in os.scandir(data_path) if gigafile.name != "labels.csv"
+        gigafile
+        for gigafile in os.scandir(f"{data_dir}_giga/")
+        if gigafile.name != "labels.csv"
     }
     n_gigafiles = len(gigafiles_set)
     start_time = perf_counter()
@@ -257,11 +258,11 @@ def split(data_dir, args):
         l_grid = np.load(gigafile.path)
         for row in data_group_gigafile.get_group(int(gigafile.name[:-4])).itertuples():
             grid = l_grid[row.Localindex]
-            with open(save_dir + "labels.csv", "a", encoding="utf8") as file:
+            with open(f"{data_dir}/labels.csv", "a", encoding="utf8") as file:
                 file.write(
                     f"{row.Name},{row.Date},{row.Leadtime},{row.Member},{gigafile.name},{row.Localindex}\n"
                 )
-            np.save(data_dir + row.Name + ".npy", grid)
+            np.save(f"{data_dir}/{row.Name}.npy", grid)
 
 
 if __name__ == "__main__":
@@ -329,8 +330,8 @@ if __name__ == "__main__":
     # rename_rr_files(RAW_DATA_DIR, args)
     # process_all(RAW_DATA_DIR, variable_name_list, SAVE_DIR, args)
     # merge_into_gigafiles(SAVE_DIR, "splitted", args)
-    if args.crop:
-        merge_into_gigafiles(SAVE_DIR, "cropped", args)
+    # if args.crop:
+    #     merge_into_gigafiles(SAVE_DIR, "cropped", args)
 
     #### CROPPING FROM GIGA SPLITTED ####
 
@@ -342,5 +343,5 @@ if __name__ == "__main__":
 
     #### SPLITTING FROM GIGAFILE ####
     ## PATH ##
-    # DATA_PATH = args.split_dir
-    # split(DATA_PATH, args)
+    DATA_PATH = args.split_dir
+    split(DATA_PATH, args)
