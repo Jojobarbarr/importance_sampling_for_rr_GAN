@@ -1,9 +1,16 @@
+import os
 import random as rd
-from time import time
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
-from called.utile import make_save_dir, print_progress, print_progress_bar
+from scipy.optimize import fsolve
+
+try:
+    from called.utile import make_save_dir, print_progress, print_progress_bar
+except ModuleNotFoundError:
+    from utile import make_save_dir, print_progress, print_progress_bar
+
 
 
 def create_dirs(save_dir, args):
@@ -13,67 +20,40 @@ def create_dirs(save_dir, args):
         save_dir (str): the save directory
         args (argparse.Namespace): args of the program
     """
-    for instance in range(args.n_instances_pre + 1, args.n_instances + 1):
-        save_dir_instance = save_dir + "INST" + str(instance) + "/"
+    for instance in range(1, args.n_instances + 1):
+        save_dir_instance = f"{save_dir}INST{instance}/"
         make_save_dir(save_dir_instance, args)
-        with open(save_dir_instance+"labels.csv", "a", encoding="utf8") as file:
-            file.write("Name,Date,Leadtime,Member,Gigafile,Localindex,Importance\n")
+        with open(f"{save_dir_instance}labels.csv", "w", encoding="utf8") as file:
+            file.write(f"Name,Date,Leadtime,Member,Gigafile,Localindex,Importance\n")
             file.close()
 
-def importance(grid, parameters, args):
+def compute_c(s_rr, q_min, m, l_c):
+    filter_func = lambda c: m + ((q_min - m) / np.tanh(-s_rr / c)) * np.tanh((1 - s_rr) / c) - 1
+    l_c = np.abs(fsolve(filter_func, l_c))
+    if np.abs(l_c[0] - l_c[1]) < 0.01:
+        return l_c[0]
+    raise RuntimeError(f"fsolve didn't converge: {l_c}")
+
+def filter(x, s_rr, q_min, m, c):
+    return m + ((q_min - m) / np.tanh(-s_rr / c)) * np.tanh((x - s_rr / c))
+
+def importance(grid, parameters, gridshape, variable, args):
     """Compute the importance of a grid
 
     Args:
         grid (numpy.array): a numpy array grid with several channels of shape = [4, x, y]
-        parameters (tuple[float]): Parameters of importance sampling (q_min, m, p, q, s_rr, s_w)
+        parameters (tuple[float]): Parameters of importance sampling (s_rr, q_min, m, c)
         args (argparse.Namespace): args of the program
     Returns:
-        float: the importance. If greater than 1, return 1
+        float: the importance.
     """
-    q_min, m, p, q, s_rr, s_w = parameters
-    i_s_rr = 1-np.exp(-grid[0]/s_rr)
-    i_s_rr = np.expand_dims(i_s_rr, axis=0)
-    grid = np.append(grid, i_s_rr, axis=0)
-    i_s_rr_sum = grid[4].sum()
-    if args.wind_importance:
-        w = np.sqrt(grid[1]**2+grid[2]**2)
-        i_s_w = (1-np.exp(-w/s_w))
-        i_s_w = np.expand_dims(i_s_w, axis=0)
-        grid = np.append(grid, i_s_w, axis=0)
-        i_s_w_sum = grid[5].sum()
-    grid_size = grid.shape[1]*grid.shape[2] # shape = [5 or 6, x, y]
-    if args.wind_importance:
-        return q_min + (m / grid_size) * (p * i_s_rr_sum + q * i_s_w_sum)
-    return q_min + (m / grid_size) * (p * i_s_rr_sum)
+    if args.verbose >= 5 and not args.progress_bar: print(f"Computing importance...")
+    s_rr, q_min, m, c = parameters
+    i_grid = filter(grid[variable], s_rr, q_min, m, c)
+    grid_size = gridshape[0]*gridshape[1] # shape = [4, x, y]
+    return np.sum(i_grid) / grid_size
 
-def importance_sig(grid, parameters, args):
-    """Compute the importance of a grid
-
-    Args:
-        grid (numpy.array): a numpy array grid with several channels of shape = [4, x, y]
-        parameters (tuple[float]): Parameters of importance sampling (q_min, m, p, q, s_rr, s_w)
-        args (argparse.Namespace): args of the program
-    Returns:
-        float: the importance. If greater than 1, return 1
-    """
-    q_min, m, p, q, s_rr, s_w = parameters
-    slope = 1
-    i_s_rr = 1 / (1 + np.exp(-(grid[0] - s_rr) / slope))
-    i_s_rr = np.expand_dims(i_s_rr, axis=0)
-    grid = np.append(grid, i_s_rr, axis=0)
-    i_s_rr_sum = grid[4].sum()
-    if args.wind_importance:
-        w = np.sqrt(grid[1]**2+grid[2]**2)
-        i_s_w = 1 / (1 + np.exp(-(w - s_w) / slope))
-        i_s_w = np.expand_dims(i_s_w, axis=0)
-        grid = np.append(grid, i_s_w, axis=0)
-        i_s_w_sum = grid[5].sum()
-    grid_size = grid.shape[1]*grid.shape[2] # shape = [5 or 6, x, y]
-    if args.wind_importance:
-        return q_min - m / (1 + np.exp(s_rr / slope)) + (m / grid_size) * (p * i_s_rr_sum + q * i_s_w_sum)
-    return q_min - m / (1 + np.exp(s_rr / slope)) + (m / grid_size) * (p * i_s_rr_sum)
-
-def sample_for_instance(save_dir, p_importance, row, args):
+def sample_from_instance(save_dir, p_importance, row, args):
     """For each instance, sample and writes data in the csv file
 
     Args:
@@ -82,49 +62,47 @@ def sample_for_instance(save_dir, p_importance, row, args):
         row (_type_): A row from a dataframe
         args (argparse.Namespace): args of the program
     """
-    for instance in range(args.n_instances_pre + 1, args.n_instances + 1):
-        save_dir_instance = save_dir + "INST" + str(instance) + "/"
+    if args.verbose >= 5 and not args.progress_bar: print(f"Sampling...")
+    for instance in range(1, args.n_instances + 1):
+        save_dir_instance = f"{save_dir}INST{instance}/"
         p_uniform = rd.uniform(0, 1)
         if p_uniform <= p_importance:
-            with open(save_dir_instance+"labels.csv", "a", encoding="utf8") as file:
-                file.write(row["Name"]+","+row["Date"]+","+str(row["Leadtime"]) +","+str(row["Member"])+","+ str(row["Gigafile"]) + "," + str(row["Localindex"]) + "," +str(p_importance)+"\n")
-                file.close()
+            with open(f"{save_dir_instance}labels.csv", "a", encoding="utf8") as file:
+                file.write(f"{row['Name']},{row['Date']},{row['Leadtime']},{row['Member']},{row['Gigafile']},{row['Localindex']},{p_importance}\n")
 
-def importance_sampling(parameters, dirs, args):
+def importance_sampling(parameters, dirs, gridshape, variable, args):
     """Compute importance sampling with parameters parameters
 
     Args:
-        parameters (tuple[float]): Parameters of importance sampling (q_min, m, p, q, s_rr, s_w)
+        parameters (tuple[float]): Parameters of importance sampling (s_rr, q_min, m, c)
         dirs (str): Directories with which data interact (csv_dir, data_dir, save_dir)
         args (argparse.Namespace): args of the program
     """
-    if args.verbose >= 1: print("Importance sampling...")
+    if args.verbose >= 1: print(f"Importance sampling...")
     csv_dir, data_dir, save_dir = dirs
     create_dirs(save_dir, args)
-
-    dataframe = pd.read_csv(csv_dir + "labels.csv")
-    dataframe = dataframe.reset_index()
-    n_grid = len(dataframe)
-    current_patch = 0
-    n_patch = dataframe.iloc[-1]["Gigafile"]
-    start_time = time()
-    for index, row in dataframe.iterrows():
-        if args.verbose >= 2 and (index + 1) % (n_grid // args.refresh) == 0:
-            print_progress(index, n_grid, start_time)
-        if row["Gigafile"] != current_patch:
-            current_patch += 1
-            if args.verbose >= 2: print("\nLoading patch", current_patch, "/", n_patch, "...")
-            l_grid = np.load(data_dir + str(current_patch) + ".npy")
-            if args.verbose >= 2: print("Done.\n")
-        grid = l_grid[row["Localindex"]]
-        if args.verbose >= 3: print("Grid", index, "out of", n_grid)
-        if args.sigmoid:
-            p_importance = importance_sig(grid, parameters, args)
-        else:
-            p_importance = importance(grid, parameters, args)
-        sample_for_instance(save_dir, p_importance, row, args)
-    if args.verbose >= 1: print("DONE importance sampling.")
+    dataframe = pd.read_csv(f"{csv_dir}labels.csv")
+    s_gigafile = {gigafile for gigafile in os.scandir(data_dir) if gigafile.name != "labels.csv"}
+    n_gigafile = len(s_gigafile)
+    start_time = perf_counter()
+    for idx_gigafile, gigafile in enumerate(s_gigafile):
+        if args.verbose >= 2:
+            print(f"Loading patch {gigafile.name} ({idx_gigafile + 1}/{n_gigafile})...")
+            if (idx_gigafile + 1) % ((n_gigafile // args.refresh) + 1) == 0:
+                print_progress(idx_gigafile, n_gigafile, start_time)
+        l_grid = np.load(f"{gigafile.path}")
+        dataframe_gigafile = dataframe.groupby("Gigafile").get_group(int(gigafile.name[:-4]))
+        for idx_grid, grid in enumerate(l_grid):
+            if args.progress_bar: print_progress_bar(idx_grid, len(l_grid))
+            p_importance = importance(grid, parameters, gridshape, variable, args)
+            sample_from_instance(save_dir, p_importance, dataframe_gigafile.iloc[idx_grid], args)
+        del l_grid
+    if args.verbose >= 2: print(f"All gigafiles processed.")
+    if args.verbose >= 1: print(f"Importance sampling for parameters {parameters} DONE.")
 
 
 if __name__ == "__main__":
-    pass
+    try:
+        compute_c(5, 0.001, 500)
+    except RuntimeError as error:
+        print(f"{repr(error)}")

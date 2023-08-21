@@ -1,85 +1,105 @@
 from argparse import ArgumentParser
 
-from called.process_is import importance_sampling
-from called.stats import run_stat, save_mix
-from called.utile import make_save_dir, parse_float
+from called.process_is import importance_sampling, compute_c
+from stats import run_stat
 
-# nohup python3 -u main.py -vv -r 5 -p -1 3 1 0 3 0 --n_instances 50 pre_proc_31-07-10h/cropped_giga/ 2-08-8h_256/ > output/-1_3_3.txt 2> output/-1_3_3.err &
+# nohup python3 -u main.py -vv -r 5 -p 5 0.001 500 --n_instances 50 pre_proc_31-07-10h/cropped_giga/ 11-08-11h_default/ > output/default.txt 2> output/default.err &
 
+DEFAULT_PARAM = [5, 0.001, 500]
 #### ARGPARSE ####
 parser = ArgumentParser()
 
-parser.add_argument("directory", type=str, default=None, help="Data directory from which data is loaded")
-parser.add_argument("save", type=str, default=None, help="Data directory where the data is saved")
+parser.add_argument("directory", type=str, help="Data directory from which data is loaded")
+parser.add_argument("save", type=str, help="Data directory where the data is saved")
+parser.add_argument("--l_c", type=float, nargs="*", help="The initial points for fsolve. MUST BE CLOSE TO THE ROOT")
 parser.add_argument("-r", "--refresh", type=int, default=10, help="Frequence at which progress is shown")
 parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
-parser.add_argument("-p", "--param", type=float, nargs="*", help="Importance sampling parameters. If not specified, take the values : [0.01, 0.1, 1, 0, 1, 0]")
-parser.add_argument("-t", "--threshold", type=float, default=0.1, help="Threshold for stats")
-parser.add_argument("--sigmoid", action="store_true", help="If used, run importance sampling with the sigmoid function")
+parser.add_argument("-p", "--param", type=float, nargs="*", help=f"Importance sampling parameters. If not specified, take the values : {DEFAULT_PARAM}")
+parser.add_argument("-t", "--threshold", type=float, default=0, help="Threshold for stats")
+parser.add_argument("-b", "--progress_bar", action="store_true", help="Print the progress bar")
+
 parser.add_argument("--stats_only", action="store_true", help="If used, only run_stat and save_mix are executed")
-parser.add_argument("--main_path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/", help="Base path")
+parser.add_argument("--main_path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/", help="Base path")
 parser.add_argument("--n_instances", type=int, default=1, help="Number of instances")
-parser.add_argument("--n_instances_pre", type=int, default=0, help="Number of instances already sampled")
-parser.add_argument("--wind_importance", action="store_true", default=False, help="use it if you want to compute wind importance")
+
+######################################
+parser.add_argument("--force", action="store_true")
+parser.add_argument("--old_param", type=str)
+######################################
 
 args = parser.parse_args()
-if args.directory is None:
-    raise ValueError("Must specified a directory with --d")
 if args.param is None:
-    args.param = [0.01, 0.1, 1, 0, 1, 0]
-    print("Default parameter list :", args.param)
+    args.param = DEFAULT_PARAM[5, 0.001, 500]
+    print(f"Default parameter list: {args.param}")
+if args.l_c is None:
+    args.l_c = [1, 1.25]
+
+
 
 #### GLOBAL ####
 ## IMPORTANCE SAMPLING ##
-
-Q_MIN, M, P, Q, S_RR, S_W = args.param
-
-PARAMETERS = (Q_MIN, M, P, Q, S_RR, S_W)
-PARAM_STRING = parse_float(str(Q_MIN) + "_" + str(M) + "_" + str(P) + "_" + str(Q) + "_" + str(S_RR) + "_" + str(S_W))
+S_RR, Q_MIN, M = args.param
+if not args.stats_only:
+    C = compute_c(S_RR, Q_MIN, M, args.l_c)
+else:
+    C = 0
+PARAMETERS = (S_RR, Q_MIN, M, C)
+PARAMETERS_STR = f"{S_RR}_{Q_MIN}_{M}"
 
 ## STATS ##
-VAR = "rr"
+VARIABLE= f"rr"
 THRESHOLD = args.threshold
-GRIDSHAPE = [256, 256]
+GRIDSHAPE = (256, 256)
 
-VAR_NAMES = ["rr", "u", "v", "t2m"]
-VAR = VAR_NAMES.index(VAR)
-THRESHOLD_STR = parse_float(str(THRESHOLD))
+VAR_NAMES = (f"rr", f"u", f"v", f"t2m")
+VARIABLE= VAR_NAMES.index(VARIABLE)
+THRESHOLD_STR = f"{THRESHOLD}"
 #### PATH ####
-MAIN_PATH = args.main_path
-DIRECTORY = args.directory
+MAIN_PATH = f"{args.main_path}"
+DIRECTORY = f"{args.directory}"
 
 #### IMPORTANCE SAMPLING ####
 ## PATH ##
-CSV_DIR = MAIN_PATH + DIRECTORY
-DATA_DIR = MAIN_PATH + DIRECTORY
-SAVE_DIR = MAIN_PATH + "importance_sampling/" + args.save + PARAM_STRING +"/"
+CSV_DIR = f"{MAIN_PATH}{DIRECTORY}"
+DATA_DIR = f"{MAIN_PATH}{DIRECTORY}"
+SAVE_DIR = f"{MAIN_PATH}{args.save}{PARAMETERS_STR}/"
 
 DIRS = (CSV_DIR, DATA_DIR, SAVE_DIR)
 
 if not args.stats_only:
-    importance_sampling(PARAMETERS, DIRS, args)
+    importance_sampling(PARAMETERS, DIRS, GRIDSHAPE, VARIABLE, args)
 
 #### STATS ####
 ## PATH ##
-CSV_DIR_IS = SAVE_DIR
-SAVE_DIR = MAIN_PATH + "analysis/" + args.save + PARAM_STRING + "/"
-DIRS = (CSV_DIR, CSV_DIR_IS, DATA_DIR, SAVE_DIR)
+######################################
+if args.force:
+    PARAMETERS_STR = args.old_param.split(' ')
+    PARAMETERS_STR = '_'.join(PARAMETERS_STR)
+    CSV_DIR = f"{MAIN_PATH}{DIRECTORY}"
+    DATA_DIR = f"{MAIN_PATH}{DIRECTORY}"
+    SAVE_DIR = f"{MAIN_PATH}{args.save}{PARAMETERS_STR}/"
+    DIRS = (DATA_DIR, SAVE_DIR)
+    run_stat(DIRS, VARIABLE, GRIDSHAPE, args)
+######################################
+else:
+    DIRS = (DATA_DIR, SAVE_DIR)
 
-run_stat(VAR, GRIDSHAPE, DIRS, THRESHOLD, args)
 
-print(PARAM_STRING, "DONE.")
+    run_stat(DIRS, VARIABLE, GRIDSHAPE, args)
 
-#### VISUALIZE ####
-## PATH ##
-DATA_DIR = SAVE_DIR
-SAVE_DIR = DATA_DIR + "mix/threshold_" + THRESHOLD_STR + "/" 
-make_save_dir(SAVE_DIR, args)
+    print(PARAMETERS_STR, "DONE.")
 
-DIRS = (DATA_DIR, SAVE_DIR)
+    # #### VISUALIZE ####
+    # ## PATH ##
+    # DATA_DIR = SAVE_DIR
+    # SAVE_DIR = DATA_DIR + "mix/threshold_" + THRESHOLD_STR + "/" 
+    # # make_save_dir(SAVE_DIR, args)
 
-print("Bootstrapping...")
+    # DIRS = (DATA_DIR, SAVE_DIR)
 
-save_mix(PARAM_STRING, THRESHOLD_STR, DIRS, args)
-print("Bootstrapping done.")
+    # print("Bootstrapping...")
 
+    # # save_mix(PARAMETERS_STR, THRESHOLD_STR, DIRS, args)
+    # print("Bootstrapping done.")
+
+    print(f"DONE")

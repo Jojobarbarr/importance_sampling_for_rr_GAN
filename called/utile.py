@@ -1,6 +1,6 @@
 import os
 import random as rd
-from time import time
+from time import perf_counter
 
 import numpy as np
 
@@ -14,10 +14,10 @@ def print_progress(index, n_tot, start_time):
         start_time (float): time at which the loop was started
     """
     progress = 100 * index / n_tot
-    elapsed_time = time() - start_time
+    elapsed_time = perf_counter() - start_time
     if progress != 0:
-        print("\033[92m\n", progress, " % in ", elapsed_time, " s...", sep="")
-        print("Remaining around", (100 - progress) * elapsed_time / progress, "s\033[0m\n")
+        print(f"\033[92m\n{progress}% in {elapsed_time}s...")
+        print(f"Remaining around {(100 - progress) * elapsed_time / progress}s\033[0m\n")
 
 def parse_float(str_float):
     str_float = [char.replace(".", "-") for char in str_float]
@@ -40,10 +40,12 @@ def print_progress_bar(iteration, total, prefix = "", suffix = "", decimals = 1)
     filled_length = int(length * iteration // total)+1
     bar_elem = fill * filled_length + "-" * (length - filled_length)
     print(f"\r{prefix} |{bar_elem}| {percent}% {suffix}", end = print_end)
+    if iteration + 1 >= total:
+        print("\n")
 
 
 
 def make_save_dir(save_dir, args):
     if not os.path.exists(save_dir) and not os.path.exists(save_dir+"_done"):
-        if args.verbose >= 2: print("creating save dir", save_dir)
+        if args.verbose >= 6: print(f"creating save dir {save_dir}")
         os.makedirs(save_dir)
