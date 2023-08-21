@@ -180,7 +180,7 @@ def crop_from_gigafiles(data_path_giga, save_dir,  args):
             print("\n")
     merge_into_gigafiles(save_dir, "cropped", args)
 
-def split(data_path_giga, save_dir, args):
+def split(data_dir, args):
     """Split gigafiles into small unit files.
 
     Args:
@@ -189,27 +189,25 @@ def split(data_path_giga, save_dir, args):
         args (argparse.Namespace): args of the program
     """
     if args.verbose >= 1: print("Splitting from gigafiles...")
-    make_save_dir(save_dir, args)
-    with open(save_dir + "labels.csv", "w", encoding="utf8") as file:
-        file.write("Name,Date,Leadtime,Member\n")
-        file.close()
-    dataframe = pd.read_csv(data_path_giga + "labels.csv")
+    make_save_dir(f"{data_dir}/", args)
+    with open(f"{data_dir}/labels.csv", "w", encoding="utf8") as file:
+        file.write("Name,Date,Leadtime,Member,Gigafile,Localindex\n")
+    dataframe = pd.read_csv(f"{data_dir}_giga/labels.csv")
     data_group_gigafile = dataframe.groupby("Gigafile")
-    n_gigafiles = sum(1 for entry in os.scandir(data_path_giga)) - 1
-    start_time = time()
-    for index, entry in enumerate(os.scandir(data_path_giga)):
+    gigafiles_set = {gigafile for gigafile in os.scandir(data_path) if gigafile.name != "labels.csv"}
+    n_gigafiles = len(gigafiles_set)
+    start_time = perf_counter()
+    for idx_gigafile, gigafile in enumerate(gigafiles_set):
         if args.verbose >= 2: 
-            print("Processing Gigafile", index + 1, "of", n_gigafiles)
-            if args.verbose >= 3 and (index + 1) % (n_gigafiles // args.refresh) == 0:
-                print_progress(index, n_gigafiles, start_time)
-        if entry.name != "labels.csv":
-            l_grid = np.load(entry.path, allow_pickle=True)
-            for row in data_group_gigafile.get_group(int(entry.name[:-4])).itertuples():
-                grid = l_grid[row.Localindex]
-                with open(save_dir + "labels.csv", "a", encoding="utf8") as file:
-                    file.write(row.Name + "," + row.Date + "," + str(row.Leadtime) + "," + str(row.Member) + "\n")
-                    file.close()
-                np.save(save_dir + row.Name + ".npy", grid, allow_pickle=True)
+            print("Processing Gigafile", idx_gigafile + 1, "of", n_gigafiles)
+            if args.verbose >= 3 and (idx_gigafile + 1) % ((n_gigafiles // args.refresh) + 1) == 0:
+                print_progress(idx_gigafile, n_gigafiles, start_time)
+        l_grid = np.load(gigafile.path)
+        for row in data_group_gigafile.get_group(int(gigafile.name[:-4])).itertuples():
+            grid = l_grid[row.Localindex]
+            with open(save_dir + "labels.csv", "a", encoding="utf8") as file:
+                file.write(f"{row.Name},{row.Date},{row.Leadtime},{row.Member},{gigafile.name},{row.Localindex}\n")
+            np.save(data_dir + row.Name + ".npy", grid)
 
 if __name__ == "__main__":
     ## ARGPARSE ##
@@ -223,6 +221,8 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--refresh", type=int, default=5, help="Frequence at which progress is shown")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
 
+    parser.add_argument("--split_dir", type=str, help="When using split() on priam")
+
     args = parser.parse_args()
 
 
@@ -235,7 +235,7 @@ if __name__ == "__main__":
     # nohup python3 -u pre_proc_for_is.py -vv -c 11-08 > pre_proc.out 2> pre_proc.err &
     # ## PATH ##
     RAW_DATA_DIR = args.load_directory
-    SAVE_DIR = args.save_path + "pre_proc_" + args.save_directory + "/"
+    SAVE_DIR = f"{args.save_path}pre_proc_{args.save_directory}/"
     
     # rename_rr_files(RAW_DATA_DIR, args)
     # process_all(RAW_DATA_DIR, variable_name_list, SAVE_DIR, args)
@@ -252,8 +252,6 @@ if __name__ == "__main__":
     # crop_from_gigafiles(DATA_PATH_GIGA, SAVE_DIR, args)
 
     #### SPLITTING FROM GIGAFILE ####
-    # python3 pre_proc_for_is.py --save_path "/scratch/mrmn/gandonb/data/source/" -vvv --load_directory "/scratch/mrmn/gandonb/data/source/DIR_giga/" DIR
     ## PATH ##
-    # DATA_PATH_GIGA = args.load_directory
-    # SAVE_DIR = args.save_path + args.save_directory + "/"
-    # split(DATA_PATH_GIGA, SAVE_DIR, args)
+    # DATA_PATH = args.split_dir
+    # split(DATA_PATH, args)
