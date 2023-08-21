@@ -236,6 +236,7 @@ def split(data_dir, args):
     """
     if args.verbose >= 1:
         print("Splitting from gigafiles...")
+    make_save_dir(f"{data_dir}/", args)
     with open(f"{data_dir}/labels.csv", "w", encoding="utf8") as file:
         file.write("Name,Date,Leadtime,Member,Gigafile,Localindex\n")
     dataframe = pd.read_csv(f"{data_dir}_giga/labels.csv")
