@@ -25,7 +25,6 @@ def create_dirs(save_dir, args):
         make_save_dir(save_dir_instance, args)
         with open(f"{save_dir_instance}labels.csv", "w", encoding="utf8") as file:
             file.write(f"Name,Date,Leadtime,Member,Gigafile,Localindex,Importance\n")
-            file.close()
 
 def compute_c(s_rr, q_min, m, l_c):
     filter_func = lambda c: m + ((q_min - m) / np.tanh(-s_rr / c)) * np.tanh((1 - s_rr) / c) - 1
@@ -36,6 +35,12 @@ def compute_c(s_rr, q_min, m, l_c):
 
 def filter(x, s_rr, q_min, m, c):
     return m + ((q_min - m) / np.tanh(-s_rr / c)) * np.tanh((x - s_rr / c))
+    
+def rough_filter(x, s_rr, q_min, m):
+    return m * (x >= s_rr) + q_min * (x < s_rr)
+
+def ravuri_filter(x, s_rr, q_min, m):
+    return q_min + m * (1 - np.exp(-x/s_rr))
 
 def importance(grid, parameters, gridshape, variable, args):
     """Compute the importance of a grid
@@ -49,7 +54,12 @@ def importance(grid, parameters, gridshape, variable, args):
     """
     if args.verbose >= 5 and not args.progress_bar: print(f"Computing importance...")
     s_rr, q_min, m, c = parameters
-    i_grid = filter(grid[variable], s_rr, q_min, m, c)
+    if args.rough:
+        i_grid = rough_filter(grid[variable], s_rr, q_min, m)
+    elif args.ravuri:
+        i_grid = ravuri_filter(grid[variable], s_rr, q_min, m)
+    else:
+        i_grid = filter(grid[variable], s_rr, q_min, m, c)
     grid_size = gridshape[0]*gridshape[1] # shape = [4, x, y]
     return np.sum(i_grid) / grid_size
 
@@ -82,7 +92,7 @@ def importance_sampling(parameters, dirs, gridshape, variable, args):
     csv_dir, data_dir, save_dir = dirs
     create_dirs(save_dir, args)
     dataframe = pd.read_csv(f"{csv_dir}labels.csv")
-    s_gigafile = {gigafile for gigafile in os.scandir(data_dir) if gigafile.name != "labels.csv"}
+    s_gigafile = {gigafile for gigafile in os.scandir(data_dir) if gigafile.name != "labels.csv" and "~" not in gigafile.name}
     n_gigafile = len(s_gigafile)
     start_time = perf_counter()
     for idx_gigafile, gigafile in enumerate(s_gigafile):

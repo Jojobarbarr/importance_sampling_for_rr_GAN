@@ -1,9 +1,45 @@
+import json
 import os
 from argparse import ArgumentParser
+from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from called.utile import make_save_dir, parse_float
+
+
+def compare(data_dir, args):
+    dirs_list = [directory for directory in os.scandir(data_dir) if "~" not in directory.name]
+    n_dirs = len(dirs_list)
+    riddle_list = [(dir1, dir2) for idx_dir1, dir1 in enumerate(dirs_list) for dir2 in dirs_list[idx_dir1:] if dir1 != dir2]
+    v_couple_list = [(0, 20), (1, 15), (4, 20), (20, 70), (40, 60)]
+    for v_couple in v_couple_list:
+        for couple in riddle_list:
+            plt.clf()
+            for directory in couple:
+                with open(f"{directory.path}/~stats/extracted_values.json") as countfile:
+                    counter = Counter(json.load(countfile))
+                save_dir_img = f"{data_dir}~pictures/"
+                end_filename = f""
+                if len(counter):
+                    keys = np.array(sorted(list(map(float, counter.keys()))))
+                    values = np.array([counter[str(key)] for key in keys])
+                    v_min, v_max = v_couple
+                    v_min_transformed, v_max_transformed = v_min, v_max
+                    # for _ in range(args.log_transform):
+                    #     save_dir_img += "log/"
+                    #     keys = np.log(1 + keys)
+                    #     end_filename += f"_log"
+                    #     v_min_transformed, v_max_transformed = np.log(1 + v_min_transformed), np.log(1 + v_max_transformed)
+                    sns.histplot(x=keys, weights=values, stat="density", bins=int(v_max-v_min) * 2, binrange=(v_min_transformed, v_max_transformed), label=directory.name, alpha=0.6)
+            plt.xlabel("rr")
+            plt.legend()
+            make_save_dir(save_dir_img, args)
+            plt.savefig(f"{save_dir_img}extracted_values_{couple[0].name}_{couple[1].name}_{v_min}_{v_max}_{end_filename}.png")
+    
+
+
 
 
 def mix(working_dir, threshold, args):
@@ -75,22 +111,15 @@ if __name__ == "__main__":
     parser.add_argument("-t", "--threshold", type=float, default=0.1, help="Threshold for the statistics.")
     parser.add_argument("-b", "--bins", type=int, default=100, help="Number of bins for the histogram")
     group_log_transformation = parser.add_mutually_exclusive_group()
-    group_log_transformation.add_argument("-l", "--log_transform", action="store_true", help="If used, transform data to log(1+data)")
-    group_log_transformation.add_argument("-ll", "--double_log_transform", action="store_true", help="If used, transform data to log(log(1+data))")
+    group_log_transformation.add_argument("-l", "--log_transform", action="count", default=0, help="If used, transform data to log(1+data) times l is written")
     parser.add_argument("-s", "--std", action="store_true", help="If used, transform data to ((data - mean) / max) * 0.95")
     parser.add_argument("-m", "--med", action="store_true", help="If used, transform data to ((data - med) / max) * 0.95")
+    parser.add_argument("-p", "--path", type=str, default="/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/", help="Main path of work")
     parser.add_argument("data_dir", type=str, help="Directory of interest. Ex: 27-07-16h30/ (don't forget the '/' at the end)")
 
     args = parser.parse_args()
-    
     if args.range is None:
         args.range = [0, 30]
-        if args.log_transform:
-            args.range = [0, 5]
-        elif args.double_log_transform:
-            args.range = [0, 2]
-        if args.std:
-            args.range = [-1, 1]
 
         # self.means = list(tuple(Means))
         # self.stds = list(tuple((1.0/0.95)*(Maxs)))
@@ -98,6 +127,7 @@ if __name__ == "__main__":
     THRESHOLD = args.threshold
 
     #### PATH ####
-    MAIN_PATH = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/analysis/" + args.data_dir
+    MAIN_PATH = args.path + args.data_dir
     
-    mix(MAIN_PATH, THRESHOLD, args)
+    # mix(MAIN_PATH, THRESHOLD, args)
+    compare(MAIN_PATH, args)

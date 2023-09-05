@@ -17,18 +17,18 @@ from called.utile import (make_save_dir, parse_float, print_progress,
                           print_progress_bar)
 from matplotlib import pyplot as plt
 
-
+THRESHOLD_LIST = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 17, 20, 25, 30]
 class Instance:
     def __init__(self, entry, gridshape):
         self.orders_ = 3
         self.entry_ = entry
         self.gridsize_ = gridshape[0] * gridshape[1]
-        self.stats_arrays_count_ = {"extracted_values": Counter(), "sample_names": Counter()}
+        self.stats_arrays_count_ = {"extracted_values": Counter(), "sample_names": Counter(), "area_proportion": {k: 0 for k in THRESHOLD_LIST}}
         self.orders_maps_list_ = [np.zeros(gridshape) for _ in range(self.orders_)]
         self.stats_numbers_dict_ = {"global_rate": 0, "mean": 0, "n_files": 0, "n_files_no_rain": 0, "n_files_greater_than_1mm": 0, "n_files_greater_than_5mm": 0}
 
     def reset(self, gridshape):
-        self.stats_arrays_count_ = {"extracted_values": Counter(), "sample_names": Counter()}
+        self.stats_arrays_count_ = {"extracted_values": Counter(), "sample_names": Counter(), "area_proportion": {k: 0 for k in THRESHOLD_LIST}}
         self.orders_maps_list_ = [np.zeros(gridshape) for _ in range(self.orders_)]
         self.stats_numbers_dict_ = {"global_rate": 0, "mean": 0, "n_files": 0, "n_files_no_rain": 0, "n_files_greater_than_1mm": 0, "n_files_greater_than_5mm": 0}
 
@@ -50,6 +50,15 @@ class Instance:
             fig.colorbar(img)
             fig.savefig(f"{save_dir_img}order_{order}.png")
             plt.close(fig)
+        plt.clf()
+        keys = np.array(sorted(list(self.stats_arrays_count_["area_proportion"].keys())))
+        values = np.array([self.stats_arrays_count_["area_proportion"][key] for key in keys])
+        plt.plot(keys, values)
+        plt.yscale("log")
+        plt.xlabel("s_rr")
+        plt.ylabel("Area proportion (log10)")
+        plt.title("Area proportion for precipitation >= s_rr")
+        plt.savefig(f"{save_dir_img}area_proportion.png")
         if len(self.stats_arrays_count_["extracted_values"]):
             keys = sorted(list(map(float, self.stats_arrays_count_["extracted_values"].keys())))
             values = [self.stats_arrays_count_["extracted_values"][str(key)] for key in keys]
@@ -61,6 +70,7 @@ class Instance:
     def sns_plot(self, keys, values, v_min, v_max, save_dir_img):
         plt.clf()
         sns.histplot(x=keys, weights=values, stat="density", bins=(v_max-v_min) * 2, binrange=(v_min, v_max))
+        plt.xlabel("rr")
         plt.savefig(f"{save_dir_img}extracted_values_{v_min}_{v_max}.png")
 
     def save_patch(self, gigafile_name, verbose_level, args):
@@ -111,12 +121,12 @@ class Instance:
         self.orders_maps_list_[order] = order_map
     
     def update_stats_arrays(self, data_path, gigafile_set):
-        self.stats_arrays_count_["sample_names"] = Counter()
         for name in self.stats_arrays_count_:
             for gigafile in gigafile_set:
                 data_dir = f"{data_path}gigafile_{gigafile.name[:-4]}/"
                 with open(f"{data_dir}{name}.json") as countfile:
                     self.stats_arrays_count_[name].update(json.load(countfile))
+        self.stats_arrays_count_["area_proportion"] = {int(key): value / (self.stats_numbers_dict_["n_files"] * self.gridsize_) for key, value in self.stats_arrays_count_["area_proportion"].items()}
 
     def cleanup_gigafiles_stats(self):
         for gigafile_stats in os.scandir(f"{self.entry_.path}/~stats/"):
@@ -128,7 +138,7 @@ class Parameter:
         self.orders_ = 3
         self.data_dir_ = data_dir
         self.gridsize_ = gridshape[0] * gridshape[1]
-        self.stats_arrays_count_ = {"extracted_values": Counter(), "sample_names": Counter()}
+        self.stats_arrays_count_ = {"extracted_values": Counter(), "sample_names": Counter(), "area_proportion": Counter()}
         self.orders_maps_list_ = [np.zeros(gridshape) for _ in range(self.orders_)]
         self.stats_numbers_dict_ = {"n_instances": 0, "global_rate": 0, "mean": 0, "n_files": 0, "n_files_no_rain": 0, "n_files_greater_than_1mm": 0, "n_files_greater_than_5mm": 0, "n_files_different": 0, "ratio_n_files_different_over_n_files_total":0, "ratio_n_files_no_rain_over_n_files_total": 0, "ratio_n_files_greater_than_1mm_over_n_files_total": 0, "ratio_n_files_greater_than_5mm_over_n_files_total": 0}
 
@@ -150,6 +160,15 @@ class Parameter:
             fig.colorbar(img)
             fig.savefig(f"{save_dir_img}order_{order}.png")
             plt.close(fig)
+        plt.clf()
+        keys = np.array(sorted(list(self.stats_arrays_count_["area_proportion"].keys())))
+        values = np.array([self.stats_arrays_count_["area_proportion"][key] for key in keys])
+        plt.plot(keys, values)
+        plt.yscale("log")
+        plt.xlabel("s_rr")
+        plt.ylabel("Area proportion (log10)")
+        plt.title("Area proportion for precipitation >= s_rr")
+        plt.savefig(f"{save_dir_img}area_proportion.png")
         if len(self.stats_arrays_count_["extracted_values"]):
             keys = sorted(list(map(float, self.stats_arrays_count_["extracted_values"].keys())))
             values = [self.stats_arrays_count_["extracted_values"][str(key)] for key in keys]
@@ -177,7 +196,6 @@ class Parameter:
         self.save_order_maps(save_dir)
         self.save_counts(save_dir)
         self.save_plots(save_dir_img)
-
         json_numbers = json.dumps(self.stats_numbers_dict_, indent=4)
         with open(f"{save_dir}log.json", "w", encoding="utf8") as logfile:
             logfile.write(json_numbers)
@@ -209,12 +227,12 @@ class Parameter:
         self.orders_maps_list_[order] = order_map
     
     def update_stats_arrays(self, instances_list):
-        self.stats_arrays_count_["sample_names"] = Counter()
         for name in self.stats_arrays_count_:
             for instance in instances_list:
                 data_dir = f"{instance.entry_.path}/~stats/"
                 with open(f"{data_dir}{name}.json") as countfile:
                     self.stats_arrays_count_[name].update(json.load(countfile))
+        self.stats_arrays_count_["area_proportion"] = {int(key): value / self.stats_numbers_dict_["n_instances"] for key, value in self.stats_arrays_count_["area_proportion"].items()}
     
     def divide(self):
         for name in self.stats_numbers_dict_:
@@ -227,7 +245,7 @@ class Parameter:
 
 def run_stat(dirs, variable, gridshape, args):
     giga_dir, data_dir = dirs
-    gigafiles_set = {gigafile for gigafile in os.scandir(giga_dir) if gigafile.name != "labels.csv"}
+    gigafiles_set = {gigafile for gigafile in os.scandir(giga_dir) if (gigafile.name != "labels.csv" and "~" not in gigafile.name)}
     n_gigafiles = len(gigafiles_set)
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
@@ -271,7 +289,7 @@ def initialize_instances(data_dir, gridshape):
     return sorted([Instance(instance, gridshape) for instance in os.scandir(data_dir) if "~" not in instance.name], key=lambda x: int(x.entry_.name[4:]))
 
 def prepare_dataframe_list(instances_list, data_dir, args):
-    return [pd.read_csv(f"{data_dir}{instance.entry_.name}/labels.csv").groupby("Gigafile") for instance in instances_list]
+    return [pd.read_csv(f"{instance.entry_.path}/labels.csv").groupby("Gigafile") for instance in instances_list]
 
 def process_instance(instance, gigafile_name, l_grid, dataframe_list, variable, gridshape, args):
     instance_idx = int(instance.entry_.name[4:]) - 1
@@ -281,6 +299,7 @@ def process_instance(instance, gigafile_name, l_grid, dataframe_list, variable, 
 
     instance.stats_arrays_count_["extracted_values"].update(extract_values_greater_than_threshold(data_sampled, variable, args))
     instance.stats_arrays_count_["sample_names"].update(dataframe_for_gigafile_idx["Name"].tolist())
+    instance.stats_arrays_count_["area_proportion"].update(count_pixels_greater_than(variable, data_sampled, args))
 
     instance.orders_maps_list_ = [order_map for order_map in sum_map_values_greater_than_threshold(data_sampled, variable, instance.orders_, gridshape, args)]
 
@@ -365,8 +384,13 @@ def extract_parallel(args_list):
     extract = [float(elem) for elem in extract]
     return Counter(extract)
     
+def count_pixels_greater_than(variable, grids, args):
+    counter_dict = {k: 0 for k in THRESHOLD_LIST}
+    for idx_threshold, threshold in enumerate(THRESHOLD_LIST):
+        counter_dict[threshold] += int(np.sum(grids[:, 0, :, :] > threshold))
+    return counter_dict
 
-def compute_area_greater_than(variable, data, args):
+def compute_area_greater_than(variable, data_dir, gridshape, args):
     """Extract from each grid all the values greater than threshold and store them in a list
 
     Args:
@@ -377,23 +401,33 @@ def compute_area_greater_than(variable, data, args):
     Returns:
         list[float]: store every value greater than the threshold
     """
-    if args.verbose >= 3: print(f"\nExtracting values greater than {args.threshold}...")
-    n_grid = len(data)
-    grid = data[0]
-    x_length, y_length = grid.shape[1], grid.shape[2]
-    l_mean_proportion = []
-    for idx, grid in enumerate(data):
-        if args.verbose >= 4: print_progress_bar(idx, n_grid)
-        mask = grid[variable] > args.threshold
-        extracted_values = grid[variable][mask]
-        l_mean_proportion.append(len(extracted_values) / (x_length * y_length))
+    threshold_list = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 17, 20, 25, 30]
+    gigafile_set = {gigafile for gigafile in os.scandir(data_dir) if gigafile.name not in ["area_proportions.npy", "area_proportions.png", "labels.csv"]}
+    n_gigafiles = len(gigafile_set)
+    x_length, y_length = gridshape[0], gridshape[1]
+    l_mean_proportion = np.zeros([len(threshold_list)])
+    start_time = perf_counter()
+    n_grid = 0
+    for idx_gigafile, gigafile in enumerate(gigafile_set):
+        if (idx_gigafile + 1) % ((n_gigafiles // args.refresh) + 1) == 0:
+            print_progress(idx_gigafile, n_gigafiles, start_time)
+        print(f"Loading gigafile {gigafile.name} ({idx_gigafile + 1}/{n_gigafiles})")
+        l_grid = np.load(gigafile.path)
+        n_grid += len(l_grid)
+        for idx_threshold, threshold in enumerate(threshold_list):
+            if args.verbose >= 4: print_progress_bar(idx_threshold, len(threshold_list))
+            for idx, grid in enumerate(l_grid):
+                mask = grid[variable] > threshold
+                extracted_values = grid[variable][mask]
+                l_mean_proportion[idx_threshold] += len(extracted_values)
+    l_mean_proportion /= (gridshape[0] * gridshape[1] * n_grid)
     return l_mean_proportion
 
 
 if __name__ == "__main__":
     ## ARGPARSE ##
     parser = ArgumentParser()
-    parser.add_argument("-r", "--refresh", type=int, default=10, help="Progress is shown 'refresh' times")
+    parser.add_argument("-r", "--refresh", type=int, default=25, help="Progress is shown 'refresh' times")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
     parser.add_argument("--n_instances", type=int, default=50, help="Number of instances")
     parser.add_argument("-t", "--threshold", type=float, default=0, help="Threshold for stats")
@@ -409,24 +443,34 @@ if __name__ == "__main__":
     # stat_on_source(DATA_DIR, SAVE_DIR, args)
 
     #### COMPUTE AREA ####
-    # ## PATH ## 
-    # DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/pre_proc_31-07-10h/cropped_giga/"
-    # dataframe = pd.read_csv(DATA_DIR + "labels.csv")
-    # mean_proportion = 0
-    # for gigafile in os.scandir(DATA_DIR):
-    #     if gigafile.name != "labels.csv":
-    #         arr = np.load(DATA_DIR + gigafile.name)
-    #         l_mean_proportion = compute_area_greater_than(0, arr, 10, args)
-    #         mean = sum(l_mean_proportion) / len(l_mean_proportion)
-    #         mean_proportion += mean
-    # mean_proportion /= dataframe.iloc[-1].Gigafile
-    # print("Mean proportion:", mean_proportion)
+    ## PATH ## 
+    DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/data_for_importance_sampling/pre_proc_11-08/cropped_120_376_540_796_giga/"
+    l_thresholds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 30]
+    # l_mean = compute_area_greater_than(0, DATA_DIR, [256, 256], l_thresholds, args)
+    # print(l_mean)
+    # np.save(f"{DATA_DIR}area_proportions.npy", l_mean)
+    l_mean = np.load(f"{DATA_DIR}area_proportions.npy")
+    plt.plot(l_thresholds, l_mean)
+    plt.yscale("log")
+    plt.xlabel("s_rr")
+    plt.ylabel("Area proportion (log10)")
+    plt.title("Area proportion for precipitation >= s_rr")
+    plt.savefig(f"{DATA_DIR}area_proportionslog10.png")
+    plt.clf()
+    plt.plot(l_thresholds, l_mean)
+    plt.xlabel("s_rr")
+    plt.ylabel("Area proportion (log10)")
+    plt.title("Area proportion for precipitation >= s_rr")
+    plt.savefig(f"{DATA_DIR}area_proportions.png")
 
-    GIGA_DIRS = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/pre_proc_31-07-10h/cropped_giga/test/"
-    DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/importance_sampling/"
-    DIRS = (GIGA_DIRS, DATA_DIR)
-    variable = 0
-    run_stat(DIRS, 0, [256, 256], args)
+
+
+
+    # GIGA_DIRS = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/pre_proc_31-07-10h/cropped_giga/test/"
+    # DATA_DIR = "/cnrm/recyf/NO_SAVE/Data/users/gandonb/importance_sampling/output/importance_sampling/"
+    # DIRS = (GIGA_DIRS, DATA_DIR)
+    # variable = 0
+    # run_stat(DIRS, 0, [256, 256], args)
     # compute_stats_on_every_session(DATA_DIR, CSV_DIR, variable, args)
 
 
