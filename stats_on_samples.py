@@ -131,7 +131,8 @@ class Instance:
 
     def cleanup_gigafiles_stats(self):
         for gigafile_stats in os.scandir(f"/scratch/mrmn/gandonb/making_stats/~Set_{self.set_number_}/step_{self.step_}/~stats/"):
-            shutil.rmtree(gigafile_stats.path)
+            if os.path.isdir(gigafile_stats.path):
+                shutil.rmtree(gigafile_stats.path)
 
 
 class Parameter:
@@ -241,7 +242,7 @@ def run_stat(_Fsample_dir, set_number, step, variable, gridshape, args):
     gigafiles_set = {gigafile for gigafile in os.scandir(giga_dir) if (f"_Fsample_{step}_" in gigafile.name and "~" not in gigafile.name)}
     n_gigafiles = len(gigafiles_set)
 
-    with concurrent.futures.ProcessPoolExecutor(max_workers=12) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=10) as executor:
         future_to_idx = {executor.submit(process_gigafile, gigafile.name, gigafile.path, set_number, step, variable, gridshape, args) for idx_gigafile, gigafile in enumerate(gigafiles_set)}
 
     for idx, future in enumerate(concurrent.futures.as_completed(future_to_idx)):
@@ -440,18 +441,18 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("-r", "--refresh", type=int, default=25, help="Progress is shown 'refresh' times")
     parser.add_argument("-v", "--verbose", action="count", default=0, help="Increase verbosity")
-    parser.add_argument("--n_instances", type=int, default=50, help="Number of instances")
     parser.add_argument("-t", "--threshold", type=float, default=0, help="Threshold for stats")
     parser.add_argument("-s", "--set", default=1, type=int, help="Set number")
+    parser.add_argument("-i", "--instance_num", default=1, type=int, help="Instance number from Set")
 
     args = parser.parse_args()
 
     set_number = args.set
     dir_string = "stylegan2_stylegan_dom_256_lat-dim_512_bs_32_0.0002_0.0002_ch-mul_2_vars_rr_noise_True"
-    instance_number = 1
+    instance_number = args.instance_num
     _Fsample_dir = f"/scratch/mrmn/gandonb/Exp_StyleGAN/Set_{set_number}/{dir_string}/Instance_{instance_number}/samples/"
 
-    steps_list = [k*2000 for k in range(25)]
+    steps_list = [k*2000 for k in range(26)]
     gridshape = (256, 256)
     for step in steps_list:
         print(f"Step {step}")
