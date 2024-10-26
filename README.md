@@ -1,3 +1,9 @@
+# Pre-processing code for Météo France internship.
+## Goal
+The idea is to pre process a large dataset of AROME outputs. AROME is the model used by Météo France to simulate the atmosphere.
+The code here is executed on a supercomputer in Météo France, and scripts to launch it are available.
+
+## Use
 From the beginning:
 Open these 3 files and uncomment eveything in the main section then execute them one after the over
 
